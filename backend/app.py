@@ -1,11 +1,27 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 import sqlite3, bcrypt, jwt, datetime, os
 
-app = Flask(__name__)
-CORS(app, origins="*")
+# Serve frontend from ../frontend folder
+FRONTEND = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'frontend')
+
+app = Flask(__name__, static_folder=FRONTEND, static_url_path='')
+CORS(app)
+
 SECRET = os.environ.get("JWT_SECRET", "fitstreak-secret-change-in-prod")
-DB = "fitstreak.db"
+DB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fitstreak.db")
+
+# ---------- SERVE FRONTEND ----------
+@app.route('/')
+def index():
+    return send_from_directory(FRONTEND, 'index.html')
+
+@app.route('/<path:path>')
+def static_files(path):
+    full = os.path.join(FRONTEND, path)
+    if os.path.exists(full):
+        return send_from_directory(FRONTEND, path)
+    return send_from_directory(FRONTEND, 'index.html')
 
 # ---------- DB SETUP ----------
 def get_db():
@@ -141,7 +157,6 @@ def today_log():
               distractions=excluded.distractions,
               notes=excluded.notes
         """, (uid, today, d.get("exercises","[]"), d.get("distractions","[]"), d.get("notes","")))
-        # Check and award streaks
         streak, longest = calc_streak(uid, db)
         user = db.execute("SELECT streak_goal, coins FROM users WHERE id=?", (uid,)).fetchone()
         coins_earned = check_rewards(uid, streak, user["streak_goal"], user["coins"], db)
@@ -199,7 +214,6 @@ def check_rewards(uid, streak, goal, coins, db):
                 )
                 db.execute("UPDATE users SET coins=coins+? WHERE id=?", (reward, uid))
                 earned = reward
-    # Goal milestone
     if streak == goal and goal not in milestones:
         existing = db.execute(
             "SELECT id FROM rewards WHERE user_id=? AND type=?", (uid, f"goal_{goal}")
@@ -215,4 +229,6 @@ def check_rewards(uid, streak, goal, coins, db):
     return earned
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    print("\n✅ FitStreak is running!")
+    print("👉 Open your browser and go to: http://127.0.0.1:5000\n")
+    app.run(debug=True, port=5000, host='127.0.0.1')
