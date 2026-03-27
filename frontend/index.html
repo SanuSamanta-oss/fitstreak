@@ -197,6 +197,7 @@
           <div class="save-bar">
             <span id="save-status" class="save-status"></span>
             <button class="btn btn-primary btn-sm" onclick="saveToday()">Save Today</button>
+            
           </div>
         </div>
 
@@ -358,56 +359,64 @@
   // Patch error rendering
   const _origDoLogin = doLogin;
   function doLogin() {
-    const err = document.getElementById("login-error");
-    err.textContent = "";
-    err.style.display = "none";
-    const email = document.getElementById("login-email").value.trim();
-    const password = document.getElementById("login-password").value;
-    if (!email || !password) {
-      err.textContent = "All fields required";
-      err.style.display = "block";
-      return;
-    }
-    api("/login", "POST", { email, password })
-      .then(data => {
-        state.token = data.token;
-        localStorage.setItem("fs_token", data.token);
-        return loadApp();
-      })
-      .catch(e => {
-        err.textContent = e.message;
-        err.style.display = "block";
-      });
+  const err = document.getElementById("login-error");
+  err.style.display = "none";
+
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+
+  if (!email || !password) {
+    err.textContent = "All fields required";
+    err.style.display = "block";
+    return;
   }
 
+  const { signInWithEmailAndPassword } = window.firebaseFns;
+
+  signInWithEmailAndPassword(window.auth, email, password)
+    .then(() => {
+      state.logs = JSON.parse(localStorage.getItem("fs_logs")) || [];
+      state.streak = parseInt(localStorage.getItem("fs_streak")) || 0;
+      loadApp(); // your dashboard
+    })
+    .catch(e => {
+      err.textContent = e.message;
+      err.style.display = "block";
+    });
+}
+
   function doRegister() {
-    const err = document.getElementById("reg-error");
-    err.textContent = "";
-    err.style.display = "none";
-    const username = document.getElementById("reg-username").value.trim();
-    const email = document.getElementById("reg-email").value.trim();
-    const password = document.getElementById("reg-password").value;
-    if (!username || !email || !password) {
-      err.textContent = "All fields required";
-      err.style.display = "block";
-      return;
-    }
-    if (password.length < 6) {
-      err.textContent = "Password must be at least 6 characters";
-      err.style.display = "block";
-      return;
-    }
-    api("/register", "POST", { username, email, password })
-      .then(data => {
-        state.token = data.token;
-        localStorage.setItem("fs_token", data.token);
-        return loadApp();
-      })
-      .catch(e => {
-        err.textContent = e.message;
-        err.style.display = "block";
-      });
+  const err = document.getElementById("reg-error");
+  err.style.display = "none";
+
+  const username = document.getElementById("reg-username").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  const password = document.getElementById("reg-password").value;
+
+  if (!username || !email || !password) {
+    err.textContent = "All fields required";
+    err.style.display = "block";
+    return;
   }
+
+  if (password.length < 6) {
+    err.textContent = "Password must be at least 6 characters";
+    err.style.display = "block";
+    return;
+  }
+
+  const { createUserWithEmailAndPassword } = window.firebaseFns;
+
+  createUserWithEmailAndPassword(window.auth, email, password)
+    .then(() => {
+      alert("Account created successfully ✅");
+      showPage("login");
+    })
+    .catch(e => {
+      err.textContent = e.message;
+      err.style.display = "block";
+    });
+}
 
   // History render
   function navTo(section) {
@@ -418,9 +427,102 @@
 
     if (section === "history") renderHistoryList();
     if (section === "rewards") {
-      state.rewards.length === 0 && api("/rewards").then(r => { state.rewards = r; renderRewards(); renderMilestones(); });
-    }
+        loadRewards();
+        renderRewards();
+        renderMilestones();
+      }
   }
+  function loadRewards() {
+  const saved = localStorage.getItem("fs_rewards");
+  state.rewards = saved ? JSON.parse(saved) : [];
+}
+
+// 🎯 Reward rules
+function checkRewards(streak) {
+  const milestones = [
+    { days: 3, coins: 50 },
+    { days: 7, coins: 150 },
+    { days: 14, coins: 300 },
+    { days: 30, coins: 750 },
+    { days: 60, coins: 1500 },
+    { days: 90, coins: 3000 },
+    { days: 180, coins: 6000 },
+    { days: 365, coins: 15000 }
+    
+  ];
+  function renderRewards() {
+  const container = document.getElementById("rewards-list");
+  if (!container) return;
+
+  if (state.rewards.length === 0) {
+    container.innerHTML = `<p style="color:var(--muted)">No rewards yet. Stay consistent 🔥</p>`;
+    return;
+  }
+
+  container.innerHTML = "";
+
+  state.rewards.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "reward-card";
+    div.innerHTML = `
+      <div>🔥 ${r.days}-Day Streak</div>
+      <div style="color:gold">+${r.coins} coins</div>
+      <div style="font-size:.7rem;color:gray">${r.date}</div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+  function saveToday() {
+  // Example: mark today as completed
+  const today = new Date().toISOString().split("T")[0];
+
+  if (!state.logs) state.logs = [];
+
+  // Avoid duplicate save
+  const already = state.logs.find(l => l.date === today);
+  if (already) {
+    alert("Already saved today!");
+    return;
+  }
+
+  // Save today's session
+  state.logs.push({
+    date: today,
+    exercises: JSON.stringify(state.todayLog.exercises || []),
+    distractions: JSON.stringify(state.todayLog.distractions || [])
+  });
+
+  // 🔥 Update streak
+  state.streak = (state.streak || 0) + 1;
+
+  // 🪙 Check rewards
+  checkRewards(state.streak);
+
+  // Save to localStorage
+  localStorage.setItem("fs_logs", JSON.stringify(state.logs));
+  localStorage.setItem("fs_streak", state.streak);
+
+  alert("Saved successfully ✅");
+
+  // Optional UI refresh
+  document.getElementById("stat-streak").textContent = state.streak;
+}
+
+  milestones.forEach(m => {
+    const already = state.rewards.find(r => r.days === m.days);
+    if (streak >= m.days && !already) {
+      state.rewards.push({
+        days: m.days,
+        coins: m.coins,
+        date: new Date().toLocaleDateString()
+      });
+    }
+  });
+
+  localStorage.setItem("fs_rewards", JSON.stringify(state.rewards));
+renderRewards();
+}
 
   function renderHistoryList() {
     const list = document.getElementById("history-list");
