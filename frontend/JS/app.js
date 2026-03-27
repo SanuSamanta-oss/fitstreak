@@ -2,7 +2,7 @@
 // FitStreak - Main App JS
 // ==============================
 
-const API = "/api";
+const API = "";
 
 // ---- STATE ----
 let state = {
@@ -29,6 +29,7 @@ async function api(path, method = "GET", body = null) {
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
 }
+
 
 // ---- AUTH ----
 async function doRegister() {

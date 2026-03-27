@@ -452,6 +452,35 @@
     });
   }
 </script>
+<script type="module">
+  // ✅ Import Firebase core + AUTH (important)
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut }
+  from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+  // ❌ Analytics not needed now (can remove safely)
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyB0Pt2h2NedVq7bENzFxGez6vFC7F9O4Hg",
+    authDomain: "fitstreak-26.firebaseapp.com",
+    projectId: "fitstreak-26",
+    storageBucket: "fitstreak-26.firebasestorage.app",
+    messagingSenderId: "69194687708",
+    appId: "1:69194687708:web:96abeb4d9e06f99383c019"
+  };
+
+  // ✅ Initialize
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+
+  // 🌍 Make global (VERY IMPORTANT for your existing code)
+  window.auth = auth;
+  window.firebaseFns = {
+    createUserWithEmailAndPassword,
+    signInWithEmailAndPassword,
+    signOut
+  };
+</script>
 <script src="JS/app.js"></script>
 </body>
 </html>
